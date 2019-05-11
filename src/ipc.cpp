@@ -52,6 +52,29 @@ inline rect_t  parse_rect_from_json(const Json::Value&  value) {
 	return r;
 }
 
+window_properties_t  parse_window_props_from_json(const Json::Value&  value) {
+	if (value.isNull()) {
+		window_properties_t result;
+		result.transient_for = 0ull;
+		return result;
+	}
+
+	window_properties_t result {
+		value["class"].asString(),
+		value["instance"].asString(),
+		value["window_role"].asString(),
+		value["title"].asString(),
+		0ull
+	};
+
+	const Json::Value transient_for = value["transient_for"];
+	if (!transient_for.isNull()) {
+		result.transient_for = transient_for.asUInt64();
+	}
+
+	return result;
+}
+
 
 static std::shared_ptr<container_t>  parse_container_from_json(const Json::Value&  o) {
 #define i3IPC_TYPE_STR "PARSE CONTAINER FROM JSON"
@@ -116,6 +139,8 @@ static std::shared_ptr<container_t>  parse_container_from_json(const Json::Value
 		}
 	}
 
+	container->window_properties = parse_window_props_from_json(o["window_properties"]);
+
 	return container;
 #undef i3IPC_TYPE_STR
 }
@@ -147,12 +172,14 @@ static std::shared_ptr<output_t>  parse_output_from_json(const Json::Value&  val
 		return std::shared_ptr<output_t>();
 	Json::Value  name = value["name"];
 	Json::Value  active = value["active"];
+	Json::Value  primary = value["primary"];
 	Json::Value  current_workspace = value["current_workspace"];
 	Json::Value  rect = value["rect"];
 
 	std::shared_ptr<output_t>  p (new output_t());
 	p->name = name.asString();
 	p->active = active.asBool();
+	p->primary = primary.asBool();
 	p->current_workspace = (current_workspace.isNull() ? std::string() : current_workspace.asString());
 	p->rect = parse_rect_from_json(rect);
 	return p;
@@ -231,7 +258,7 @@ static std::shared_ptr<bar_config_t>  parse_bar_config_from_json(const Json::Val
 	std::string  position = value["position"].asString();
 	if (position == "top") {
 		bc->position = Position::TOP;
-	} else if (mode == "bottom") {
+	} else if (position == "bottom") {
 		bc->position = Position::BOTTOM;
 	} else {
 		bc->position = Position::UNKNOWN;
