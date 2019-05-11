@@ -136,6 +136,16 @@ enum class ContainerLayout : char {
 	OUTPUT = 'o',
 };
 
+/**
+ * A type of a container's floating mode
+ */
+enum class FloatingMode : int {
+    AUTO_OFF = 0,
+    USER_OFF = 1,
+    AUTO_ON = 2,
+    USER_ON = 3,
+};
+
 
 /**
  * A type of the input of bindings
@@ -191,6 +201,7 @@ struct container_t {
 	uint32_t  current_border_width; ///< Number of pixels of the border width
 	ContainerLayout  layout; ///< A type of the container's layout
 	std::string  layout_raw; ///< A "layout" field of TREE reply. NOT empty only if layout equals ContainerLayout::UNKNOWN
+	FloatingMode floating; ///< The floating state of the container
 	float  percent; ///< The percentage which this container takes in its parent. A value of < 0 means that the percent property does not make sense for this container, for example for the root container.
 	rect_t  rect; ///< The absolute display coordinates for this container
 	rect_t  window_rect; ///< The coordinates of the actual client window inside its container. These coordinates are relative to the container and do not include the window decoration (which is actually rendered on the parent container)
