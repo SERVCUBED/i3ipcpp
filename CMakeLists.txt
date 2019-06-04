@@ -22,9 +22,9 @@ target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:-g3 -DDEBUG>)
 target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-O2>)
 
 # External library: jsoncpp-1.7.7 {{{
-
 find_package(PkgConfig)
 pkg_check_modules(JSONCPP jsoncpp>=1.7.7)
+
 
 if(NOT JSONCPP_FOUND)
   message(STATUS "Could not find jsoncpp>=1.7.7 -- building static lib...")
@@ -42,7 +42,10 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${JSONCPP_INCLUDEDIR})
 # Export lists to the parent scope if there are any {{{
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
-if(HAS_PARENT)
+if(BUILD_EXAMPLES)
+set(I3IPCPP_LIBRARIES ${PROJECT_NAME})
+set(I3IPCPP_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/include ${JSONCPP_INCLUDEDIR})
+elseif(HAS_PARENT)
   set(I3IPCPP_LIBRARIES ${PROJECT_NAME} PARENT_SCOPE)
   set(I3IPCPP_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/include ${JSONCPP_INCLUDEDIR} PARENT_SCOPE)
 endif()
