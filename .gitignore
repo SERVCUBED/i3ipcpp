@@ -2,3 +2,14 @@ build
 doc
 *.sublime-workspace
 *.log
+
+Makefile
+CMakeCache\.txt
+CMakeFiles/
+*.cbp
+\.idea/
+*.cmake
+libi3ipc\+\+\.a
+examples/bar-configs
+examples/events
+examples/workspaces
