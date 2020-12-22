@@ -36,6 +36,9 @@ void  dump_tree_container(const i3ipc::container_t&  c, std::string&  prefix) {
 	for (auto&  n : c.nodes) {
 		dump_tree_container(*n, prefix);
 	}
+	for (auto&  n : c.floating_nodes) {
+		dump_tree_container(*n, prefix);
+	}
 	prefix.pop_back();
 	prefix.pop_back();
 }
