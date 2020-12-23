@@ -151,6 +151,11 @@ static std::shared_ptr<container_t>  parse_container_from_json(const Json::Value
 	}
 	
 
+	// Floating values: auto_off user_off auto_on user_on
+	std::string floatingMode = o["floating"].asString ();
+	if (floatingMode.length() > 6)
+		container->floating = (FloatingMode) (((floatingMode[0] == 'u') & 1u) + ((floatingMode[6] == 'n') << 1));
+
 	Json::Value  nodes = o["nodes"];
 	if (!nodes.isNull()) {
 		IPC_JSON_ASSERT_TYPE_ARRAY(nodes, "nodes")

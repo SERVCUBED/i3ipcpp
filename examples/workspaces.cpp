@@ -21,6 +21,7 @@ void  dump_tree_container(const i3ipc::container_t&  c, std::string&  prefix) {
 	std::cout << prefix << "border = \"" << c.border_raw << "\"" << std::endl;
 	std::cout << prefix << "current_border_width = " << c.current_border_width << std::endl;
 	std::cout << prefix << "layout = \"" << c.layout_raw << "\"" << std::endl;
+	std::cout << prefix << "floating = \"" << ((uint8_t)c.floating & 1u ? "user" : "auto") << "_o" << ((uint8_t)c.floating & 2u ? "n" : "ff") << "\"" << std::endl;
 	std::cout << prefix << "percent = " << c.percent << std::endl;
 	if (c.workspace.has_value()) {
 		std::cout << prefix << "current_workspace = " << c.workspace.value() << std::endl;
