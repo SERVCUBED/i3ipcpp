@@ -2,6 +2,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <iostream>
+#include <memory>
 
 #include <json/json.h>
 #include <auss.hpp>
@@ -21,14 +22,14 @@ std::vector<std::ostream*>  g_logging_err_outs = {
 };
 
 #define IPC_JSON_READ(ROOT) \
-{ \
-	Json::CharReaderBuilder b; \
-	const std::unique_ptr<Json::CharReader> reader(b.newCharReader());	\
-	JSONCPP_STRING error; \
-	if(!reader->parse(buf->payload, buf->payload + buf->header->size, &ROOT, &error)) { \
-		throw invalid_reply_payload_error(auss_t() << "Failed to parse reply on \"" i3IPC_TYPE_STR "\": " << error); \
-	} \
-}
+	{ \
+		Json::CharReaderBuilder builder; \
+		std::unique_ptr<Json::CharReader>  reader{builder.newCharReader()}; \
+		std::string error;\
+		if (!reader->parse(buf->payload, buf->payload + buf->header->size, &ROOT, &error)) { \
+			throw invalid_reply_payload_error(auss_t() << "Failed to parse reply on \"" i3IPC_TYPE_STR "\": " << error); \
+		} \
+	}
 
 #define IPC_JSON_ASSERT_TYPE(OBJ, OBJ_DESCR, TYPE_CHECK, TYPE_NAME) \
 	{\
@@ -51,12 +52,35 @@ inline rect_t  parse_rect_from_json(const Json::Value&  value) {
 	return r;
 }
 
+window_properties_t  parse_window_props_from_json(const Json::Value&  value) {
+	if (value.isNull()) {
+		window_properties_t result;
+		result.transient_for = 0ull;
+		return result;
+	}
 
-static std::shared_ptr<container_t>  parse_container_from_json(const Json::Value&  o) {
+	window_properties_t result {
+		value["class"].asString(),
+		value["instance"].asString(),
+		value["window_role"].asString(),
+		value["title"].asString(),
+		0ull
+	};
+
+	const Json::Value transient_for = value["transient_for"];
+	if (!transient_for.isNull()) {
+		result.transient_for = transient_for.asUInt64();
+	}
+
+	return result;
+}
+
+
+static std::shared_ptr<container_t>  parse_container_from_json(const Json::Value&  o, std::optional<std::string> workspace_name = std::nullopt) {
 #define i3IPC_TYPE_STR "PARSE CONTAINER FROM JSON"
 	if (o.isNull())
-		return std::shared_ptr<container_t>();
-	std::shared_ptr<container_t>  container (new container_t());
+		return nullptr;
+	auto  container{std::make_shared<container_t>()};
 	IPC_JSON_ASSERT_TYPE_OBJECT(o, "o")
 
 	container->id = o["id"].asUInt64();
@@ -107,13 +131,43 @@ static std::shared_ptr<container_t>  parse_container_from_json(const Json::Value
 		I3IPC_WARN("Got a unknown \"layout\" property: \"" << layout << "\". Perhaps its neccessary to update i3ipc++. If you are using latest, note maintainer about this")
 	}
 
+	for (auto& member : o.getMemberNames()) {
+		std::string value;
+		try {
+			value = o[member].asString();
+		} catch(const std::exception&) {
+			// Just collect what we can
+			continue;
+		}
+		
+		container->map[member] = value;
+	}
+
+	if (Json::Value value{o["name"]}; container->type == "workspace" && !value.isNull()) {
+		container->workspace = value.asString();
+	} else {
+		// Inherit workspace if any
+		container->workspace = workspace_name;
+	}
+	
+
 	Json::Value  nodes = o["nodes"];
 	if (!nodes.isNull()) {
 		IPC_JSON_ASSERT_TYPE_ARRAY(nodes, "nodes")
 		for (Json::ArrayIndex  i = 0; i < nodes.size(); i++) {
-			container->nodes.push_back(parse_container_from_json(nodes[i]));
+			container->nodes.push_back(parse_container_from_json(nodes[i], container->workspace));
 		}
 	}
+
+	Json::Value  floating_nodes = o["floating_nodes"];
+	if (!floating_nodes.isNull()) {
+		IPC_JSON_ASSERT_TYPE_ARRAY(floating_nodes, "floating_nodes")
+		for (Json::ArrayIndex  i = 0; i < floating_nodes.size(); i++) {
+			container->floating_nodes.push_back(parse_container_from_json(floating_nodes[i], container->workspace));
+		}
+	}
+
+	container->window_properties = parse_window_props_from_json(o["window_properties"]);
 
 	return container;
 #undef i3IPC_TYPE_STR
@@ -146,12 +200,14 @@ static std::shared_ptr<output_t>  parse_output_from_json(const Json::Value&  val
 		return std::shared_ptr<output_t>();
 	Json::Value  name = value["name"];
 	Json::Value  active = value["active"];
+	Json::Value  primary = value["primary"];
 	Json::Value  current_workspace = value["current_workspace"];
 	Json::Value  rect = value["rect"];
 
 	std::shared_ptr<output_t>  p (new output_t());
 	p->name = name.asString();
 	p->active = active.asBool();
+	p->primary = primary.asBool();
 	p->current_workspace = (current_workspace.isNull() ? std::string() : current_workspace.asString());
 	p->rect = parse_rect_from_json(rect);
 	return p;
@@ -230,7 +286,7 @@ static std::shared_ptr<bar_config_t>  parse_bar_config_from_json(const Json::Val
 	std::string  position = value["position"].asString();
 	if (position == "top") {
 		bc->position = Position::TOP;
-	} else if (mode == "bottom") {
+	} else if (position == "bottom") {
 		bc->position = Position::BOTTOM;
 	} else {
 		bc->position = Position::UNKNOWN;
@@ -250,6 +306,11 @@ static std::shared_ptr<bar_config_t>  parse_bar_config_from_json(const Json::Val
 
 
 std::string  get_socketpath() {
+	const char*  envsock{std::getenv("I3SOCK")};
+	if (envsock) {
+		return envsock;
+	}
+
 	std::string  str;
 	{
 		auss_t  str_buf;
@@ -616,7 +677,7 @@ int32_t  connection::get_event_socket_fd() { return m_event_socket; }
 
 const version_t&  get_version() {
 #define I3IPC_VERSION_MAJOR  0
-#define I3IPC_VERSION_MINOR  4
+#define I3IPC_VERSION_MINOR  5
 #define I3IPC_VERSION_PATCH  0
 	static version_t v{};
 	v.human_readable = auss_t() << I3IPC_VERSION_MAJOR << '.' << I3IPC_VERSION_MINOR << '.' << I3IPC_VERSION_PATCH;
