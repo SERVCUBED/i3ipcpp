@@ -32,6 +32,15 @@ void  dump_tree_container(const i3ipc::container_t&  c, std::string&  prefix) {
 	if (c.focused) {
 		std::cout << prefix << "focused" << std::endl;
 	}
+	if (c.window_properties.transient_for != 0ull || c.window_properties.xclass.length()) {
+		std::cout << prefix << "window_properties = [" << std::endl;
+		std::cout << prefix << '\t' << "title = \"" << c.window_properties.title << "\"" << std::endl;
+		std::cout << prefix << '\t' << "instance = \"" << c.window_properties.instance << "\"" << std::endl;
+		std::cout << prefix << '\t' << "window_role = \"" << c.window_properties.window_role << "\"" << std::endl;
+		std::cout << prefix << '\t' << "xclass = \"" << c.window_properties.xclass << "\"" << std::endl;
+		std::cout << prefix << '\t' << "transient_for = " << c.window_properties.transient_for <<  std::endl;
+		std::cout << prefix << ']' << std::endl;
+	}
 	prefix.push_back('\t');
 	for (auto&  n : c.nodes) {
 		dump_tree_container(*n, prefix);
